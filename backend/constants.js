@@ -11,15 +11,16 @@ const constants = {
         SAVE_MANUAL_REPLAY_HIGHLIGHT: 60, // TODO, but planned
     },
     broadcastingNetworkProtocol: {
-        BROADCASTING_PROTOCOL_VERSION: 2,
+        BROADCASTING_PROTOCOL_VERSION: 4,
     },
     InboundMessageTypes: {
         REGISTRATION_RESULT: 1,
         REALTIME_UPDATE: 2,
-        REALTIME_CAR_UPDATE :3,
+        REALTIME_CAR_UPDATE: 3,
         ENTRY_LIST: 4,
         ENTRY_LIST_CAR: 6,
         TRACK_DATA: 5,
+        BROADCASTING_EVENT: 7,
     },
 
 }

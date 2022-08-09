@@ -1,111 +1,106 @@
-const dgram = require('dgram');
-const app = require('express')();
-const http = require('http').Server(app);
-const io = require('socket.io')(http);
-const api = require('./api');
-const constants = require('./constants');
-const binutils = require('binutils');
+const ACCNodeWrapper = require('acc-node-wrapper')
+const broadcasting = new ACCNodeWrapper()
 
-const PORT = 9000;
-const LOCAL_PORT = 9001;
-const HOST = '192.168.178.24';
-// const HOST = '127.0.0.1';
-const DISPLAY_NAME = 'your';
-const CONNECTION_PASSWORD = 'asd';
-const COMMAND_PASSWORD = '';
-const onClientConnectedCallback = (callback) => {
-    console.log(`I'm connected to ACC!`, callback);
-}
+/**
+ * @name initBroadcastSDK
+ * @comment This is the init function for the ACC Node Wrapper. This inits the Broadcast SDK.
+ * @param SERVER_DISPLAYNAME
+ * @param SERVER_IP
+ * @param SERVER_PORT
+ * @param SERVER_PASS
+ * @param SERVER_COMMANDPASS
+ * @param UPDATE_INTERVAL
+ * @param Logging
+ */
+broadcasting.initBroadcastSDK("Max", "127.0.0.1", 9000, "asd", "", 1000, false);
 
-let browserSocket;
+broadcasting.on("REGISTRATION_RESULT", result => {
+    //console.log(result)
+})
 
-const acc = dgram.createSocket('udp4');
-acc.bind(LOCAL_PORT);
-
-acc.on('message', message => {
-    // console.log(`raw message: ${message}`);
-    const reader = new binutils.BinaryReader(message, 'little');
-    
-    const messageType = reader.ReadUInt8();
-    switch(messageType) {
-        case constants.InboundMessageTypes.REGISTRATION_RESULT: {
-            console.log('REGISTRATION_RESULT');
-            const connectionId = reader.ReadInt32();
-            const connectionSuccess = reader.ReadBytes(1).readUInt8(0) > 0;
-            const isReadonly = reader.ReadBytes(1).readUInt8(0) === 0;
-            const errMsg = api.readString(reader);
-
-            console.log({connectionId, connectionSuccess, isReadonly, errMsg});
-
-            break;
+broadcasting.on("BROADCASTING_EVENT", result => {
+    //console.log(result);
+    if (result.Type === 'BestSessionLap') {
+        if (result.CarData) {
+            currentDriver = result.CarData.CurrentDriverIndex
+            firstName = result.CarData.Drivers[currentDriver].FirstName
+            lastName = result.CarData.Drivers[currentDriver].LastName
+            console.log("New Fastest Lap by: " + firstName, lastName, "Time: " + result.Msg);
+            console.log(result.CarData.Drivers[currentDriver]);
         }
-        case constants.InboundMessageTypes.REALTIME_UPDATE: {
-            // console.log('REALTIME_UPDATE');
-            break;
-        }
-        case constants.InboundMessageTypes.REALTIME_CAR_UPDATE: {
-            console.log('REALTIME_CAR_UPDATE');
-            const carIndex = reader.ReadUInt16();
-            const driverIndex = reader.ReadUInt16();
-            const gear = reader.ReadBytes(1).readUInt8(0) - 1;
-            const worldPosX = reader.ReadFloat();
-            const worldPosY = reader.ReadFloat();
-            const yaw = reader.ReadFloat();
-            const carLocation = reader.ReadBytes(1).readUInt8(0);
-            const kmh = reader.ReadUInt16();
-            const position = reader.ReadUInt16();
-            const cupPosition = reader.ReadUInt16();
-            const trackPosition = reader.ReadUInt16();
-            const splinePosition = reader.ReadFloat();
-            const laps = reader.ReadUInt16();
-            const delta = reader.ReadUInt32();
+    } else {
+        //console.log(result);
+    }
+})
 
-            //TODO read laps
-            // carUpdate.BestSessionLap = ReadLap(br);
-            // carUpdate.LastLap = ReadLap(br);
-            // carUpdate.CurrentLap = ReadLap(br);
+broadcasting.RequestEntryList();
 
-            console.log({carIndex, driverIndex, gear, kmh, laps, delta});
+broadcasting.on("ENTRY_LIST", result => {
+    return result;
+});
 
-            if (browserSocket) browserSocket.emit('carstate', {gear, kmh, delta});
 
-            break;
-        }
-        default: {
-            // console.log('response message type not recognized', messageType);
+/**
+ * @name getSessionDetails
+ * @comment Gets the latest cameras from the server, returns it.
+ * @returns {Promise<any>}
+ */
+
+
+
+broadcasting.on("REALTIME_UPDATE", result => {
+    // Log Camera
+    //console.log(result);
+    //console.log(result);
+    // Current Camera Set: ActiveCameraSet
+    // Current Page: CurrentHudPage
+    // Current Driver = FocusedCarIndex
+    // Best Lap So far = BestSessionLap.LapTimeMS;
+    // Log it out
+
+    console.log("Current Camera: " + result.ActiveCameraSet);
+    console.log("Current Page: " + result.CurrentHudPage);
+    console.log("Current Driver: " + result.FocusedCarIndex);
+    // Get driver from result.CarData.Drivers[result.FocusedCarIndex]
+    return result;
+});
+
+broadcasting.on("REALTIME_CAR_UPDATE", result => {
+    //console.log(result)
+    entrylist = result.Msg
+
+    // for car in entrylist list drivers
+
+    if (entrylist > 0) {
+        for (var i = 0; i < entrylist.length; i++) {
+            // for each driver in entrylist list details
+            // check if Drivers is above 0
+            if (entrylist[i].Drivers.length > 0) {
+                for (var j = 0; j < entrylist[i].Drivers.length; j++) {
+                    // if driver is current driver
+                    if (entrylist[i].Drivers[j].CurrentDriverIndex == true) {
+                        // set current driver details
+                        currentDriver = j
+                        firstName = entrylist[i].Drivers[j].FirstName
+                        lastName = entrylist[i].Drivers[j].LastName
+                        console.log("Current Driver: " + firstName, lastName);
+                    }
+                }
+            }
         }
     }
-});
+})
 
-acc.on('listening', () => {
-    const address = acc.address();
-    console.log(`server listening ${address.address}:${address.port}`);
-});
+/*broadcasting.on("REALTIME_CAR_UPDATE", result => {
+    console.log(result.CarIndex, "Gear: " + result.Gear, "KMH: " + result.Kmh, "Position: " + result.Position, "Laps: " + result.Laps)
+})*/
 
+/*broadcasting.on("BROADCASTING_EVENT", result => {
+    console.log(result)
 
-function handleError(err) {
-    if (err) {
-        console.log('ERROR');
-        console.log(err);
-    }
-}
+})*/
 
-const requestConnection = api.requestConnection(DISPLAY_NAME, CONNECTION_PASSWORD, COMMAND_PASSWORD);
-acc.send(requestConnection, 0, requestConnection.length, PORT, HOST, handleError);
-
-io.on('connection', socket => {
-    console.log('Connected from browser...');
-    socket.on('command', command => {
-        console.log('command Sent from browser');
-        console.log(command);
-        //TODO here to send messages to ACC
-    });
-
-    browserSocket = socket;
-
-    socket.emit('status', 'CONNECTED');
-});
-
-http.listen(6767, () => {
-    console.log('Socket io server up and running');
-});
+// get track data
+/*broadcasting.on("TRACK_DATA", result => {
+    console.log(result)
+})*/
